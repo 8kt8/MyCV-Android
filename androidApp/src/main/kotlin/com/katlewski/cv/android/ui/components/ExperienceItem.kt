@@ -78,7 +78,7 @@ fun ExperienceItem(experience: Experience, isLast: Boolean, modifier: Modifier =
 private fun ExperienceCard(experience: Experience, modifier: Modifier = Modifier) {
     val spacing = MaterialTheme.spacing
     val uriHandler = LocalUriHandler.current
-    val hasDetails = experience.highlights.isNotEmpty() || experience.techStack.isNotEmpty()
+    val hasDetails = experience.highlights.isNotEmpty()
     var expanded by rememberSaveable(experience.companyName, experience.period.start) { mutableStateOf(false) }
 
     Card(
@@ -127,6 +127,16 @@ private fun ExperienceCard(experience: Experience, modifier: Modifier = Modifier
                 Spacer(Modifier.height(spacing.small))
                 Text(it, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(end = spacing.xSmall))
             }
+            // Always visible: the tech stack is what people skim a CV for.
+            if (experience.techStack.isNotEmpty()) {
+                Spacer(Modifier.height(spacing.xSmall))
+                Text(
+                    experience.techStack.joinToString(" · "),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(end = spacing.xSmall),
+                )
+            }
             AnimatedVisibility(visible = expanded) {
                 Column(Modifier.padding(top = spacing.small, end = spacing.xSmall)) {
                     experience.highlights.forEach { highlight ->
@@ -134,15 +144,6 @@ private fun ExperienceCard(experience: Experience, modifier: Modifier = Modifier
                             Text("•", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary)
                             Spacer(Modifier.width(spacing.xSmall))
                             Text(highlight, style = MaterialTheme.typography.bodyMedium)
-                        }
-                    }
-                    if (experience.techStack.isNotEmpty()) {
-                        Spacer(Modifier.height(spacing.small))
-                        FlowRow(
-                            horizontalArrangement = Arrangement.spacedBy(spacing.xSmall),
-                            verticalArrangement = Arrangement.spacedBy(spacing.xSmall),
-                        ) {
-                            experience.techStack.forEach { Tag(it) }
                         }
                     }
                 }
