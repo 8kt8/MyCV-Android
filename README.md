@@ -37,7 +37,7 @@ git submodule update --remote CvApi
 - Material 3 Expressive (`MaterialExpressiveTheme`, material3 1.5): expressive motion springs, emphasized typography,
   the expressive shape scale, shape-morphing buttons, `LoadingIndicator` and a scalloped profile photo from `MaterialShapes`
 - Dynamic color on Android 12+ (brand indigo palette as fallback), light and dark theme incl. the launch window
-- Edge-to-edge with a transparent top app bar that tints and shows the name once the header scrolls away
+- Edge-to-edge with a transparent top app bar that tints and shows the name and a contact menu once the header scrolls away
 - Screen reader labels and headings
 
 Icons: [Simple Icons](https://simpleicons.org) (CC0) and [Material Symbols](https://fonts.google.com/icons) (Apache-2.0). Brand icons are trademarks of their owners.

@@ -8,6 +8,7 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
@@ -20,8 +21,12 @@ import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -38,12 +43,15 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -54,9 +62,12 @@ import com.katlewski.cv.android.ui.components.Footer
 import com.katlewski.cv.android.ui.components.ProfileHeader
 import com.katlewski.cv.android.ui.components.SectionHeader
 import com.katlewski.cv.android.ui.components.SkillsSection
+import com.katlewski.cv.android.ui.components.icon
+import com.katlewski.cv.android.ui.components.title
 import com.katlewski.cv.android.ui.icons.CvIcons
 import com.katlewski.cv.android.ui.theme.MaxContentWidth
 import com.katlewski.cv.android.ui.theme.spacing
+import com.katlewski.cv.data.ContactLink
 import com.katlewski.cv.data.Cv
 
 @Composable
@@ -87,7 +98,14 @@ fun CvScreen(state: CvUiState, onRefresh: () -> Unit, onMessageShown: () -> Unit
     // Edge-to-edge: the header gradient runs under the status and app bars.
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
-        topBar = { CvTopBar(title = state.cv?.profile?.fullName, listState = listState, scrollBehavior = scrollBehavior) },
+        topBar = {
+            CvTopBar(
+                title = state.cv?.profile?.fullName,
+                contacts = state.cv?.contacts.orEmpty(),
+                listState = listState,
+                scrollBehavior = scrollBehavior,
+            )
+        },
         snackbarHost = { SnackbarHost(snackbarHostState) },
         contentWindowInsets = WindowInsets(0),
     ) { padding ->
@@ -116,10 +134,15 @@ fun CvScreen(state: CvUiState, onRefresh: () -> Unit, onMessageShown: () -> Unit
     }
 }
 
-/** Small app bar whose title (the name) appears once the profile header has scrolled away. */
+/** Small app bar whose title (the name) and contact menu appear once the profile header has scrolled away. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun CvTopBar(title: String?, listState: LazyListState, scrollBehavior: TopAppBarScrollBehavior) {
+private fun CvTopBar(
+    title: String?,
+    contacts: List<ContactLink>,
+    listState: LazyListState,
+    scrollBehavior: TopAppBarScrollBehavior,
+) {
     val headerGone by remember { derivedStateOf { listState.firstVisibleItemIndex > 0 } }
     TopAppBar(
         title = {
@@ -133,12 +156,45 @@ private fun CvTopBar(title: String?, listState: LazyListState, scrollBehavior: T
                 Text(title.orEmpty(), maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         },
+        actions = {
+            AnimatedVisibility(
+                visible = headerGone && contacts.isNotEmpty(),
+                enter = fadeIn(MaterialTheme.motionScheme.defaultEffectsSpec()),
+                exit = fadeOut(MaterialTheme.motionScheme.fastEffectsSpec()),
+            ) {
+                ContactMenu(contacts)
+            }
+        },
         colors = TopAppBarDefaults.topAppBarColors(
             containerColor = Color.Transparent,
             scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
         ),
         scrollBehavior = scrollBehavior,
     )
+}
+
+/** All contact actions in one menu, for when the header's buttons are scrolled away. */
+@Composable
+private fun ContactMenu(contacts: List<ContactLink>) {
+    val uriHandler = LocalUriHandler.current
+    var expanded by remember { mutableStateOf(false) }
+    Box {
+        IconButton(onClick = { expanded = true }) {
+            Icon(CvIcons.Mail, contentDescription = "Contact")
+        }
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            contacts.forEach { contact ->
+                DropdownMenuItem(
+                    text = { Text(contact.type.title()) },
+                    leadingIcon = { Icon(contact.type.icon(), contentDescription = null, modifier = Modifier.size(24.dp)) },
+                    onClick = {
+                        expanded = false
+                        uriHandler.openUri(contact.url)
+                    },
+                )
+            }
+        }
+    }
 }
 
 @Composable

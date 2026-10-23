@@ -127,7 +127,8 @@ private fun ContactAction(contact: ContactLink) {
     }
 }
 
-private fun ContactType.title(): String = when (this) {
+/** Short action name, shared by the header buttons and the app bar contact menu. */
+internal fun ContactType.title(): String = when (this) {
     ContactType.GitHub -> "GitHub"
     ContactType.LinkedIn -> "LinkedIn"
     ContactType.Email -> "Email"
@@ -135,7 +136,7 @@ private fun ContactType.title(): String = when (this) {
     ContactType.Website -> "Website"
 }
 
-private fun ContactType.icon(): ImageVector = when (this) {
+internal fun ContactType.icon(): ImageVector = when (this) {
     ContactType.GitHub -> CvIcons.GitHub
     ContactType.LinkedIn -> CvIcons.LinkedIn
     ContactType.Email -> CvIcons.Mail
