@@ -3,6 +3,8 @@ package com.katlewski.cv.android.ui
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
@@ -12,35 +14,40 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawing
-import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.foundation.layout.windowInsetsTopHeight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.katlewski.cv.data.Cv
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.katlewski.cv.android.ui.components.EducationCard
 import com.katlewski.cv.android.ui.components.ExperienceItem
 import com.katlewski.cv.android.ui.components.Footer
@@ -50,6 +57,7 @@ import com.katlewski.cv.android.ui.components.SkillsSection
 import com.katlewski.cv.android.ui.icons.CvIcons
 import com.katlewski.cv.android.ui.theme.MaxContentWidth
 import com.katlewski.cv.android.ui.theme.spacing
+import com.katlewski.cv.data.Cv
 
 @Composable
 fun CvScreen(viewModel: CvViewModel) {
@@ -61,7 +69,7 @@ fun CvScreen(viewModel: CvViewModel) {
     )
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun CvScreen(state: CvUiState, onRefresh: () -> Unit, onMessageShown: () -> Unit) {
     val snackbarHostState = remember { SnackbarHostState() }
@@ -72,82 +80,100 @@ fun CvScreen(state: CvUiState, onRefresh: () -> Unit, onMessageShown: () -> Unit
         }
     }
 
-    // Edge-to-edge: the header gradient runs under the status bar; insets are applied per element.
+    val listState = rememberLazyListState()
+    // Pinned bar: transparent over the header, tonal container once content scrolls under it.
+    val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
+
+    // Edge-to-edge: the header gradient runs under the status and app bars.
     Scaffold(
+        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
+        topBar = { CvTopBar(title = state.cv?.profile?.fullName, listState = listState, scrollBehavior = scrollBehavior) },
         snackbarHost = { SnackbarHost(snackbarHostState) },
         contentWindowInsets = WindowInsets(0),
     ) { padding ->
         val cv = state.cv
         if (cv == null) {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { LoadingIndicator() }
             return@Scaffold
         }
+        val topInset = padding.calculateTopPadding()
         val pullState = rememberPullToRefreshState()
         PullToRefreshBox(
             isRefreshing = state.isRefreshing,
             onRefresh = onRefresh,
             state = pullState,
-            modifier = Modifier.fillMaxSize().padding(padding),
+            modifier = Modifier.fillMaxSize(),
             indicator = {
-                PullToRefreshDefaults.Indicator(
+                PullToRefreshDefaults.LoadingIndicator(
                     state = pullState,
                     isRefreshing = state.isRefreshing,
-                    modifier = Modifier.align(Alignment.TopCenter).windowInsetsPadding(WindowInsets.statusBars),
+                    modifier = Modifier.align(Alignment.TopCenter).padding(top = topInset),
                 )
             },
         ) {
-            CvContent(cv)
+            CvContent(cv, listState, topInset)
         }
     }
 }
 
+/** Small app bar whose title (the name) appears once the profile header has scrolled away. */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun CvContent(cv: Cv) {
+private fun CvTopBar(title: String?, listState: LazyListState, scrollBehavior: TopAppBarScrollBehavior) {
+    val headerGone by remember { derivedStateOf { listState.firstVisibleItemIndex > 0 } }
+    TopAppBar(
+        title = {
+            AnimatedVisibility(
+                visible = title != null && headerGone,
+                enter = fadeIn(MaterialTheme.motionScheme.defaultEffectsSpec()) +
+                    slideInVertically(MaterialTheme.motionScheme.defaultSpatialSpec()) { it / 2 },
+                exit = fadeOut(MaterialTheme.motionScheme.fastEffectsSpec()) +
+                    slideOutVertically(MaterialTheme.motionScheme.fastSpatialSpec()) { it / 2 },
+            ) {
+                Text(title.orEmpty(), maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+        },
+        colors = TopAppBarDefaults.topAppBarColors(
+            containerColor = Color.Transparent,
+            scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
+        ),
+        scrollBehavior = scrollBehavior,
+    )
+}
+
+@Composable
+private fun CvContent(cv: Cv, listState: LazyListState, topInset: Dp) {
     val spacing = MaterialTheme.spacing
-    val listState = rememberLazyListState()
-    val scrolled by remember { derivedStateOf { listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > 0 } }
     val headerBrush = Brush.verticalGradient(
         listOf(MaterialTheme.colorScheme.primaryContainer, MaterialTheme.colorScheme.surface),
     )
 
-    Box(Modifier.fillMaxSize()) {
-        LazyColumn(
-            state = listState,
-            horizontalAlignment = Alignment.CenterHorizontally,
-            contentPadding = PaddingValues(bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()),
-            modifier = Modifier.fillMaxSize(),
-        ) {
-            item(key = "header") {
-                Box(
-                    Modifier
-                        .fillMaxWidth()
-                        .background(headerBrush),
-                    contentAlignment = Alignment.TopCenter,
-                ) {
-                    ProfileHeader(
-                        profile = cv.profile,
-                        contacts = cv.contacts,
-                        modifier = Modifier
-                            .windowInsetsPadding(WindowInsets.statusBars)
-                            .contentWidth()
-                            .padding(horizontal = spacing.medium)
-                            .padding(top = spacing.xLarge),
-                    )
-                }
-            }
-            cvSections(cv)
-            item(key = "footer") { Footer(Modifier.contentWidth().padding(horizontal = spacing.medium)) }
-        }
-
-        // Scrim keeps the status bar legible once content scrolls underneath it.
-        AnimatedVisibility(visible = scrolled, enter = fadeIn(), exit = fadeOut()) {
+    LazyColumn(
+        state = listState,
+        horizontalAlignment = Alignment.CenterHorizontally,
+        contentPadding = PaddingValues(bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()),
+        modifier = Modifier.fillMaxSize(),
+    ) {
+        item(key = "header") {
             Box(
                 Modifier
                     .fillMaxWidth()
-                    .windowInsetsTopHeight(WindowInsets.safeDrawing)
-                    .background(MaterialTheme.colorScheme.surface),
-            )
+                    .background(headerBrush),
+                contentAlignment = Alignment.TopCenter,
+            ) {
+                ProfileHeader(
+                    profile = cv.profile,
+                    contacts = cv.contacts,
+                    modifier = Modifier
+                        .padding(top = topInset)
+                        .contentWidth()
+                        .padding(horizontal = spacing.medium)
+                        .padding(top = spacing.xSmall),
+                )
+            }
         }
+        cvSections(cv)
+        item(key = "footer") { Footer(Modifier.contentWidth().padding(horizontal = spacing.medium)) }
     }
 }
 
@@ -180,4 +206,3 @@ private fun Modifier.contentWidth(): Modifier = widthIn(max = MaxContentWidth).f
 
 @Composable
 private fun Modifier.contentPadding(): Modifier = contentWidth().padding(horizontal = MaterialTheme.spacing.medium)
-

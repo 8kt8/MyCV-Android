@@ -44,7 +44,7 @@ fun EducationCard(education: Education, modifier: Modifier = Modifier) {
     val uriHandler = LocalUriHandler.current
     Card(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
-        shape = MaterialTheme.shapes.large,
+        shape = MaterialTheme.shapes.largeIncreased,
         modifier = modifier.fillMaxWidth(),
     ) {
         Row(
@@ -54,7 +54,7 @@ fun EducationCard(education: Education, modifier: Modifier = Modifier) {
             Logo(url = education.resolvedLogoUrl, name = education.schoolName)
             Spacer(Modifier.width(spacing.small))
             Column(Modifier.weight(1f)) {
-                Text(education.schoolName, style = MaterialTheme.typography.titleMedium)
+                Text(education.schoolName, style = MaterialTheme.typography.titleMediumEmphasized)
                 Text(
                     "${education.degree} · ${education.fieldOfStudy}",
                     style = MaterialTheme.typography.bodyMedium,
@@ -82,7 +82,7 @@ fun EducationCard(education: Education, modifier: Modifier = Modifier) {
 @Composable
 fun Footer(modifier: Modifier = Modifier) {
     Text(
-        text = "Built with Kotlin Multiplatform & Compose Multiplatform",
+        text = "Built with Jetpack Compose & Kotlin Multiplatform",
         style = MaterialTheme.typography.labelSmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         textAlign = TextAlign.Center,
