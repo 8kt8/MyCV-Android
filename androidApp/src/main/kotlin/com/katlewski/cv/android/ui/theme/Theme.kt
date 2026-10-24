@@ -1,17 +1,21 @@
 package com.katlewski.cv.android.ui.theme
 
+import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.MaterialExpressiveTheme
+import androidx.compose.material3.MotionScheme
 import androidx.compose.material3.Shapes
 import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.dynamicDarkColorScheme
+import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalContext
 
-// Tonal palette around an indigo seed (#3D5AFE), following Material 3 color roles.
+// Brand tonal palette around an indigo seed (#3D5AFE), following Material 3 color roles.
+// Used below Android 12 and when dynamic color is off; matches the iOS accent color.
 private val LightColors = lightColorScheme(
     primary = Color(0xFF3650E0),
     onPrimary = Color(0xFFFFFFFF),
@@ -68,18 +72,29 @@ private val DarkColors = darkColorScheme(
     outlineVariant = Color(0xFF46464F),
 )
 
-private val CvShapes = Shapes(
-    small = RoundedCornerShape(8.dp),
-    medium = RoundedCornerShape(16.dp),
-    large = RoundedCornerShape(24.dp),
-)
-
+/**
+ * Material 3 Expressive theme: expressive motion (spring-based), the expressive shape scale
+ * (incl. largeIncreased / extraLargeIncreased) and, on Android 12+, dynamic color from the wallpaper.
+ */
 @Composable
-fun CvTheme(darkTheme: Boolean = isSystemInDarkTheme(), content: @Composable () -> Unit) {
+fun CvTheme(
+    darkTheme: Boolean = isSystemInDarkTheme(),
+    dynamicColor: Boolean = true,
+    content: @Composable () -> Unit,
+) {
+    val colorScheme = when {
+        dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
+            val context = LocalContext.current
+            if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
+        }
+        darkTheme -> DarkColors
+        else -> LightColors
+    }
     CompositionLocalProvider(LocalSpacing provides Spacing()) {
-        MaterialTheme(
-            colorScheme = if (darkTheme) DarkColors else LightColors,
-            shapes = CvShapes,
+        MaterialExpressiveTheme(
+            colorScheme = colorScheme,
+            motionScheme = MotionScheme.expressive(),
+            shapes = Shapes(),
             content = content,
         )
     }

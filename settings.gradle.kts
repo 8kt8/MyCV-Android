@@ -18,6 +18,10 @@ dependencyResolutionManagement {
     versionCatalogs {
         create("libs") {
             from(files("CvApi/gradle/libs.versions.toml"))
+            // Material 3 Expressive (MaterialExpressiveTheme, emphasized type, shape morphing, LoadingIndicator)
+            // is public from material3 1.5; the Compose BOM still pins 1.4. Switch back to the BOM's
+            // androidx-compose-material3 once a BOM ships material3 1.5 stable.
+            library("material3-expressive", "androidx.compose.material3", "material3").version("1.5.0-beta02")
         }
     }
 }

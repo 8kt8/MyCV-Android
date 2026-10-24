@@ -2,6 +2,10 @@ package com.katlewski.cv.android.ui.components
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -37,7 +41,6 @@ import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.katlewski.cv.data.AppLink
 import com.katlewski.cv.data.Experience
@@ -83,13 +86,13 @@ private fun ExperienceCard(experience: Experience, modifier: Modifier = Modifier
 
     Card(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
-        shape = MaterialTheme.shapes.large,
+        shape = MaterialTheme.shapes.largeIncreased,
         modifier = modifier,
     ) {
         Column(Modifier.padding(start = spacing.medium, end = spacing.xSmall, top = spacing.medium, bottom = spacing.xSmall)) {
             Row(verticalAlignment = Alignment.Top) {
                 Column(Modifier.weight(1f).padding(end = spacing.xSmall)) {
-                    Text(experience.role, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                    Text(experience.role, style = MaterialTheme.typography.titleMediumEmphasized)
                     Text(
                         experience.companyName,
                         style = MaterialTheme.typography.bodyLarge,
@@ -137,7 +140,12 @@ private fun ExperienceCard(experience: Experience, modifier: Modifier = Modifier
                     modifier = Modifier.padding(end = spacing.xSmall),
                 )
             }
-            AnimatedVisibility(visible = expanded) {
+            val motion = MaterialTheme.motionScheme
+            AnimatedVisibility(
+                visible = expanded,
+                enter = expandVertically(motion.defaultSpatialSpec()) + fadeIn(motion.defaultEffectsSpec()),
+                exit = shrinkVertically(motion.fastSpatialSpec()) + fadeOut(motion.fastEffectsSpec()),
+            ) {
                 Column(Modifier.padding(top = spacing.small, end = spacing.xSmall)) {
                     experience.highlights.forEach { highlight ->
                         Row(Modifier.padding(vertical = 2.dp)) {
@@ -158,9 +166,13 @@ private fun ExperienceCard(experience: Experience, modifier: Modifier = Modifier
                 }
             }
             if (hasDetails) {
-                val rotation by animateFloatAsState(if (expanded) 180f else 0f)
+                val rotation by animateFloatAsState(
+                    targetValue = if (expanded) 180f else 0f,
+                    animationSpec = MaterialTheme.motionScheme.defaultSpatialSpec(),
+                )
                 TextButton(
                     onClick = { expanded = !expanded },
+                    shapes = ButtonDefaults.shapes(),
                     modifier = Modifier.semantics {
                         stateDescription = if (expanded) "Expanded" else "Collapsed"
                     },
@@ -186,6 +198,7 @@ private fun StoreButton(app: AppLink, onClick: () -> Unit) {
     val storeName = app.store.title()
     OutlinedButton(
         onClick = onClick,
+        shapes = ButtonDefaults.shapes(),
         contentPadding = ButtonDefaults.ButtonWithIconContentPadding,
         modifier = Modifier.semantics(mergeDescendants = true) { contentDescription = "Get ${app.name} on $storeName" },
     ) {

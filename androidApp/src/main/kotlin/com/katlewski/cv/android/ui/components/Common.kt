@@ -16,7 +16,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.katlewski.cv.android.ui.theme.spacing
 
@@ -32,7 +31,7 @@ fun SectionHeader(title: String, icon: ImageVector, modifier: Modifier = Modifie
         horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.xSmall),
     ) {
         Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(22.dp))
-        Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+        Text(title, style = MaterialTheme.typography.titleLargeEmphasized)
     }
 }
 
