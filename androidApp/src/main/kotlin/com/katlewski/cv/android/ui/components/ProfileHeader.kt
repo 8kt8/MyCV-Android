@@ -2,6 +2,8 @@ package com.katlewski.cv.android.ui.components
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -34,9 +36,15 @@ import com.katlewski.cv.data.ContactLink
 import com.katlewski.cv.data.ContactType
 import com.katlewski.cv.data.Profile
 
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+/** [nameModifier] goes on the name, e.g. to track when it scrolls under the app bar. */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class, ExperimentalLayoutApi::class)
 @Composable
-fun ProfileHeader(profile: Profile, contacts: List<ContactLink>, modifier: Modifier = Modifier) {
+fun ProfileHeader(
+    profile: Profile,
+    contacts: List<ContactLink>,
+    modifier: Modifier = Modifier,
+    nameModifier: Modifier = Modifier,
+) {
     val spacing = MaterialTheme.spacing
     Column(
         modifier = modifier.fillMaxWidth(),
@@ -55,7 +63,7 @@ fun ProfileHeader(profile: Profile, contacts: List<ContactLink>, modifier: Modif
             text = profile.fullName,
             style = MaterialTheme.typography.headlineMediumEmphasized,
             textAlign = TextAlign.Center,
-            modifier = Modifier.semantics { heading() },
+            modifier = nameModifier.semantics { heading() },
         )
         Spacer(Modifier.height(spacing.xxSmall))
         Text(
@@ -83,7 +91,12 @@ fun ProfileHeader(profile: Profile, contacts: List<ContactLink>, modifier: Modif
         }
         if (contacts.isNotEmpty()) {
             Spacer(Modifier.height(spacing.large))
-            Row(horizontalArrangement = Arrangement.spacedBy(spacing.large)) {
+            // Wraps (centered) instead of overflowing with large font scales.
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(spacing.large, Alignment.CenterHorizontally),
+                verticalArrangement = Arrangement.spacedBy(spacing.medium),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
                 contacts.forEach { ContactAction(it) }
             }
         }

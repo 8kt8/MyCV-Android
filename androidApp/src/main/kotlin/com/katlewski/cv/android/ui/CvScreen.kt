@@ -1,6 +1,7 @@
 package com.katlewski.cv.android.ui
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
@@ -8,14 +9,16 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.LazyListState
@@ -27,6 +30,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -35,14 +39,15 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.Stable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -50,10 +55,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.katlewski.cv.android.ui.components.EducationCard
@@ -80,6 +85,13 @@ fun CvScreen(viewModel: CvViewModel) {
     )
 }
 
+/** Bottom edges of the app bar and of the header's name, in root coordinates, updated on layout. */
+@Stable
+private class HeaderPositions {
+    var barBottom by mutableFloatStateOf(0f)
+    var nameBottom by mutableFloatStateOf(Float.POSITIVE_INFINITY)
+}
+
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun CvScreen(state: CvUiState, onRefresh: () -> Unit, onMessageShown: () -> Unit) {
@@ -92,18 +104,22 @@ fun CvScreen(state: CvUiState, onRefresh: () -> Unit, onMessageShown: () -> Unit
     }
 
     val listState = rememberLazyListState()
-    // Pinned bar: transparent over the header, tonal container once content scrolls under it.
-    val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
+    val positions = remember { HeaderPositions() }
+    // The bar takes over the name (and the contact actions) as soon as the name scrolls under it.
+    val showTitle by remember {
+        derivedStateOf { listState.firstVisibleItemIndex > 0 || positions.nameBottom < positions.barBottom }
+    }
 
-    // Edge-to-edge: the header gradient runs under the status and app bars.
+    // Edge-to-edge: the header gradient runs under the status bar and the (still empty, transparent) app bar.
     Scaffold(
-        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
             CvTopBar(
                 title = state.cv?.profile?.fullName,
                 contacts = state.cv?.contacts.orEmpty(),
-                listState = listState,
-                scrollBehavior = scrollBehavior,
+                showTitle = showTitle,
+                modifier = Modifier.onGloballyPositioned {
+                    positions.barBottom = it.positionInRoot().y + it.size.height
+                },
             )
         },
         snackbarHost = { SnackbarHost(snackbarHostState) },
@@ -114,7 +130,6 @@ fun CvScreen(state: CvUiState, onRefresh: () -> Unit, onMessageShown: () -> Unit
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { LoadingIndicator() }
             return@Scaffold
         }
-        val topInset = padding.calculateTopPadding()
         val pullState = rememberPullToRefreshState()
         PullToRefreshBox(
             isRefreshing = state.isRefreshing,
@@ -125,51 +140,57 @@ fun CvScreen(state: CvUiState, onRefresh: () -> Unit, onMessageShown: () -> Unit
                 PullToRefreshDefaults.LoadingIndicator(
                     state = pullState,
                     isRefreshing = state.isRefreshing,
-                    modifier = Modifier.align(Alignment.TopCenter).padding(top = topInset),
+                    modifier = Modifier.align(Alignment.TopCenter).padding(top = padding.calculateTopPadding()),
                 )
             },
         ) {
-            CvContent(cv, listState, topInset)
+            CvContent(cv, listState, positions)
         }
     }
 }
 
-/** Small app bar whose title (the name) and contact menu appear once the profile header has scrolled away. */
+/**
+ * Small app bar. Transparent and empty over the header; once the name has scrolled under it, it takes
+ * the tonal container color and shows the name and a contact menu.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun CvTopBar(
     title: String?,
     contacts: List<ContactLink>,
-    listState: LazyListState,
-    scrollBehavior: TopAppBarScrollBehavior,
+    showTitle: Boolean,
+    modifier: Modifier = Modifier,
 ) {
-    val headerGone by remember { derivedStateOf { listState.firstVisibleItemIndex > 0 } }
+    val motion = MaterialTheme.motionScheme
+    val containerColor by animateColorAsState(
+        targetValue = if (showTitle) MaterialTheme.colorScheme.surfaceContainer else Color.Transparent,
+        animationSpec = motion.defaultEffectsSpec(),
+        label = "topBarContainer",
+    )
     TopAppBar(
         title = {
             AnimatedVisibility(
-                visible = title != null && headerGone,
-                enter = fadeIn(MaterialTheme.motionScheme.defaultEffectsSpec()) +
-                    slideInVertically(MaterialTheme.motionScheme.defaultSpatialSpec()) { it / 2 },
-                exit = fadeOut(MaterialTheme.motionScheme.fastEffectsSpec()) +
-                    slideOutVertically(MaterialTheme.motionScheme.fastSpatialSpec()) { it / 2 },
+                visible = title != null && showTitle,
+                enter = fadeIn(motion.defaultEffectsSpec()) + slideInVertically(motion.defaultSpatialSpec()) { it / 2 },
+                exit = fadeOut(motion.fastEffectsSpec()) + slideOutVertically(motion.fastSpatialSpec()) { it / 2 },
             ) {
                 Text(title.orEmpty(), maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         },
         actions = {
             AnimatedVisibility(
-                visible = headerGone && contacts.isNotEmpty(),
-                enter = fadeIn(MaterialTheme.motionScheme.defaultEffectsSpec()),
-                exit = fadeOut(MaterialTheme.motionScheme.fastEffectsSpec()),
+                visible = showTitle && contacts.isNotEmpty(),
+                enter = fadeIn(motion.defaultEffectsSpec()),
+                exit = fadeOut(motion.fastEffectsSpec()),
             ) {
                 ContactMenu(contacts)
             }
         },
         colors = TopAppBarDefaults.topAppBarColors(
-            containerColor = Color.Transparent,
-            scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
+            containerColor = containerColor,
+            scrolledContainerColor = containerColor,
         ),
-        scrollBehavior = scrollBehavior,
+        modifier = modifier,
     )
 }
 
@@ -179,7 +200,7 @@ private fun ContactMenu(contacts: List<ContactLink>) {
     val uriHandler = LocalUriHandler.current
     var expanded by remember { mutableStateOf(false) }
     Box {
-        IconButton(onClick = { expanded = true }) {
+        IconButton(onClick = { expanded = true }, shapes = IconButtonDefaults.shapes()) {
             Icon(CvIcons.Mail, contentDescription = "Contact")
         }
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
@@ -198,7 +219,7 @@ private fun ContactMenu(contacts: List<ContactLink>) {
 }
 
 @Composable
-private fun CvContent(cv: Cv, listState: LazyListState, topInset: Dp) {
+private fun CvContent(cv: Cv, listState: LazyListState, positions: HeaderPositions) {
     val spacing = MaterialTheme.spacing
     val headerBrush = Brush.verticalGradient(
         listOf(MaterialTheme.colorScheme.primaryContainer, MaterialTheme.colorScheme.surface),
@@ -220,11 +241,15 @@ private fun CvContent(cv: Cv, listState: LazyListState, topInset: Dp) {
                 ProfileHeader(
                     profile = cv.profile,
                     contacts = cv.contacts,
+                    // Starts under the empty app bar, so there's no bar-sized gap above the photo.
                     modifier = Modifier
-                        .padding(top = topInset)
+                        .windowInsetsPadding(WindowInsets.statusBars)
                         .contentWidth()
                         .padding(horizontal = spacing.medium)
-                        .padding(top = spacing.xSmall),
+                        .padding(top = spacing.large),
+                    nameModifier = Modifier.onGloballyPositioned {
+                        positions.nameBottom = it.positionInRoot().y + it.size.height
+                    },
                 )
             }
         }
