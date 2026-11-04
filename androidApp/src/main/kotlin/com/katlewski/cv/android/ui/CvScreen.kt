@@ -4,7 +4,9 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
@@ -21,12 +23,14 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
@@ -39,7 +43,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.katlewski.cv.android.R
 import com.katlewski.cv.data.Cv
 import com.katlewski.cv.android.ui.components.EducationCard
 import com.katlewski.cv.android.ui.components.ExperienceItem
@@ -57,13 +67,14 @@ fun CvScreen(viewModel: CvViewModel) {
     CvScreen(
         state = state,
         onRefresh = viewModel::onRefresh,
+        onRetry = viewModel::onRetry,
         onMessageShown = viewModel::onMessageShown,
     )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun CvScreen(state: CvUiState, onRefresh: () -> Unit, onMessageShown: () -> Unit) {
+fun CvScreen(state: CvUiState, onRefresh: () -> Unit, onRetry: () -> Unit, onMessageShown: () -> Unit) {
     val snackbarHostState = remember { SnackbarHostState() }
     LaunchedEffect(state.message) {
         state.message?.let {
@@ -79,7 +90,11 @@ fun CvScreen(state: CvUiState, onRefresh: () -> Unit, onMessageShown: () -> Unit
     ) { padding ->
         val cv = state.cv
         if (cv == null) {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+            if (state.loadFailed) {
+                LoadFailed(onRetry, Modifier.padding(padding))
+            } else {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+            }
             return@Scaffold
         }
         val pullState = rememberPullToRefreshState()
@@ -98,6 +113,46 @@ fun CvScreen(state: CvUiState, onRefresh: () -> Unit, onMessageShown: () -> Unit
         ) {
             CvContent(cv)
         }
+    }
+}
+
+/** Full-screen error for a variant that couldn't be loaded and isn't cached. */
+@Composable
+private fun LoadFailed(onRetry: () -> Unit, modifier: Modifier = Modifier) {
+    FullScreenMessage(stringResource(R.string.variant_load_failed), modifier) {
+        Button(onClick = onRetry) { Text(stringResource(R.string.try_again)) }
+    }
+}
+
+/** Shown for a `/c/` link without a valid code. */
+@Composable
+fun InactiveLinkScreen() {
+    Scaffold(contentWindowInsets = WindowInsets(0)) { padding ->
+        FullScreenMessage(stringResource(R.string.link_inactive), Modifier.padding(padding))
+    }
+}
+
+@Composable
+private fun FullScreenMessage(
+    text: String,
+    modifier: Modifier = Modifier,
+    action: @Composable () -> Unit = {},
+) {
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .windowInsetsPadding(WindowInsets.safeDrawing)
+            .padding(MaterialTheme.spacing.large),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.medium, Alignment.CenterVertically),
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.titleMedium,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
+        )
+        action()
     }
 }
 
