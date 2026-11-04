@@ -180,17 +180,20 @@ class CvViewModelTest {
 
     @Test
     fun defaultOfflineKeepsBundledCv() {
+        val bundled = runBlocking {
+            CvService(HttpClient(MockEngine { error("unused") })).use { it.bundledCv() }
+        }
         val vm = viewModel(CvMode.Default) { null }
 
-        // Bundled sample data (CvApi's sample-cv.json); no error and no snackbar for the background refresh.
+        // Bundled CV stays; no error and no snackbar for the background refresh.
         val state = vm.awaitIdle()
-        assertEquals("Alex Sample", state.cv?.profile?.fullName)
+        assertEquals(bundled, state.cv)
         assertFalse(state.loadFailed)
         assertNull(state.message)
 
         vm.onRefresh()
         val afterRefresh = vm.awaitIdle()
-        assertEquals("Alex Sample", afterRefresh.cv?.profile?.fullName)
+        assertEquals(bundled, afterRefresh.cv)
         assertFalse(afterRefresh.loadFailed)
         assertNotNull(afterRefresh.message)
     }
